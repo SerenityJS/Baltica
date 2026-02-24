@@ -18,8 +18,7 @@ export class OpenConnectionReplyOne extends DataPacket {
       this.writeUint64(this.guid);
       this.writeBool(this.security);
       if (this.security) {
-         this.writeBool(this.hasCookie);
-         if (this.hasCookie && this.cookie != null) {
+         if (this.cookie != null) {
             this.writeUint32(this.cookie);
          }
          if (this.serverPublicKey) {
@@ -38,10 +37,8 @@ export class OpenConnectionReplyOne extends DataPacket {
       this.hasCookie = false;
       this.serverPublicKey = null;
       if (this.security) {
-         this.hasCookie = this.readBool();
-         if (this.hasCookie) {
-            this.cookie = this.readUint32();
-         }
+         this.hasCookie = true;
+         this.cookie = this.readUint32();
       }
       this.mtu = this.readUint16();
       return this;
