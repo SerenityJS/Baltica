@@ -99,9 +99,11 @@ const bridge = new Bridge({
   },
 });
 
-bridge.on("connect", (player) => {
-  console.log("Player bridged:", player.player.connection.identifier);
-});
+bridge.on("connect", con => {
+  con.on("serverBound-PlayerAuthInputPacket", (packet) => {
+    console.log(packet.packet);
+  })
+})
 
 bridge.on("disconnect", (player) => {
   console.log("Player left bridge");

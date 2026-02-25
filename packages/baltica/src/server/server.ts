@@ -57,6 +57,7 @@ export class Server extends Emitter<ServerEvents> {
       });
 
       await this.raknet.start();
+      Logger.info(`Server listening on ${this.options.address}:${this.options.port}`);
    }
 
    public onDisconnect(player: Player): void {
