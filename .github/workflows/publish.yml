@@ -2,8 +2,8 @@ name: Build & Publish
 
 on:
   push:
-    tags:
-      - "v*"
+    branches:
+      - master
 
 jobs:
   publish:
@@ -27,24 +27,28 @@ jobs:
       - run: bun run build
 
       - name: Publish @baltica/utils
+        continue-on-error: true
         run: npm publish --access public
         working-directory: packages/utils
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Publish @baltica/auth
+        continue-on-error: true
         run: npm publish --access public
         working-directory: packages/auth
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Publish @baltica/raknet
+        continue-on-error: true
         run: npm publish --access public
         working-directory: packages/raknet
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Publish baltica
+        continue-on-error: true
         run: npm publish --access public
         working-directory: packages/baltica
         env:
