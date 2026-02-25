@@ -172,8 +172,8 @@ export class Client extends Emitter<ClientEvents> {
       this.on("DisconnectPacket" as PacketNames, (pkt: any) => {
          const reason = pkt?.message?.message ?? pkt?.message ?? "Unknown reason";
          Logger.info(`Disconnected by server: ${reason}`);
-         this.close();
          this.emit("disconnect", String(reason));
+         this.close();
       });
    }
 
@@ -183,13 +183,11 @@ export class Client extends Emitter<ClientEvents> {
    }
 
    public disconnect(reason = "client disconnect"): void {
-      try {
-         const packet = new (Packets[Packet.Disconnect] as any)();
-         this.send(packet.serialize());
-      } catch { }
-      this.raknet.disconnect();
-      this.removeAllListeners();
       this.emit("disconnect", reason);
+      setTimeout(() => {
+         this.raknet.disconnect();
+         this.removeAllListeners();
+      }, 50);
    }
 
    private async authenticate(): Promise<void> {

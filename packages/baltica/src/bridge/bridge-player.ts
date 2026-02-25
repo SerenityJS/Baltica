@@ -60,13 +60,12 @@ export class BridgePlayer extends Emitter<BridgePlayerEvents> {
    }
 
    public routePacket(rawBuffer: Buffer, clientBound: boolean): void {
-      let buffer: Buffer = rawBuffer;
       const id = getPacketId(rawBuffer);
       const PacketClass = Packets[id as keyof typeof Packets];
 
       if (!PacketClass) {
-         if (clientBound) this.player.send(buffer);
-         else this.client.send(buffer);
+         if (clientBound) this.player.send(rawBuffer);
+         else this.client.send(rawBuffer);
          return;
       }
 
@@ -77,25 +76,37 @@ export class BridgePlayer extends Emitter<BridgePlayerEvents> {
       const hasSpecific = this.listenerCount(event) > 0;
       const hasWildcard = this.listenerCount(wildcard) > 0;
 
-      if (hasSpecific || hasWildcard) {
-         try {
-            const ctx = {
-               packet: new PacketClass(buffer).deserialize(),
-               cancelled: false,
-               modified: false,
-            };
+      let cancelled = false;
+      let outBuffer = rawBuffer;
 
+      if (hasSpecific || hasWildcard) {
+         let deserialized: any = null;
+         const ctx = {
+            get packet() {
+               if (!deserialized) {
+                  try { deserialized = new PacketClass(Buffer.from(rawBuffer)).deserialize(); }
+                  catch { deserialized = rawBuffer; }
+               }
+               return deserialized;
+            },
+            set packet(v: any) { deserialized = v; },
+            cancelled: false,
+            modified: false,
+         };
+
+         try {
             if (hasSpecific) this.emit(event, ctx as any);
             if (hasWildcard) this.emit(wildcard, ctx as any, PacketClass.name);
+         } catch { }
 
-            if (ctx.cancelled) return;
-            if (ctx.modified) buffer = ctx.packet.serialize();
-         } catch {
-            // Deserialization failed — forward the raw buffer as-is
+         cancelled = ctx.cancelled;
+         if (ctx.modified && deserialized) {
+            try { outBuffer = deserialized.serialize(); } catch { }
          }
       }
 
-      if (clientBound) this.player.send(buffer);
-      else this.client.send(buffer);
+      if (cancelled) return;
+      if (clientBound) this.player.send(outBuffer);
+      else this.client.send(outBuffer);
    }
 }

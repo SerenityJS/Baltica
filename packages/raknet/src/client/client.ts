@@ -128,15 +128,18 @@ export class Client extends Emitter<ClientEvents> {
       this.network.send = () => {};
       this.network.removeAllListeners();
       try {
-         if (this.relay) this.relay.close();
-         else if (this.socket) this.socket.close();
+         if (this.relay) { this.relay.close(); this.relay = undefined; }
+         else if (this.socket) { this.socket.close(); (this as any).socket = undefined; }
       } catch {}
    }
 
    public disconnect(): void {
       const packet = new Disconnect();
-      this.sendReliable(packet.serialize(), Priority.High);
-      this.close();
-      this.emit("disconnect");
+      try { this.sendReliable(packet.serialize(), Priority.High); } catch {}
+      // Give UDP time to actually send the packet before closing
+      setTimeout(() => {
+         this.close();
+         this.emit("disconnect");
+      }, 150);
    }
 }
