@@ -105,6 +105,104 @@ export async function refreshMicrosoftToken(
    };
 }
 
+export async function authenticateWithPassword(
+   clientId: string,
+   email: string,
+   password: string,
+): Promise<MicrosoftTokens> {
+   const authorizeUrl =
+      `https://login.live.com/oauth20_authorize.srf?client_id=${clientId}` +
+      `&redirect_uri=https://login.live.com/oauth20_desktop.srf` +
+      `&scope=service::user.auth.xboxlive.com::MBI_SSL` +
+      `&display=touch&response_type=token&locale=en`;
+
+   const pageResponse = await fetch(authorizeUrl);
+   if (!pageResponse.ok) {
+      throw new Error(`Failed to load Microsoft login page: ${pageResponse.status}`);
+   }
+   const pageHtml = await pageResponse.text();
+
+   const ppftMatch = pageHtml.match(/sFTTag":".*?value=\\"(.+?)\\"/)
+      ?? pageHtml.match(/sFTTag':'.*?value="(.+?)"/);
+   if (!ppftMatch) throw new Error("Could not extract PPFT token from login page");
+   const ppft = ppftMatch[1]!;
+
+   const urlPostMatch = pageHtml.match(/urlPost":"(.+?)"/)
+      ?? pageHtml.match(/urlPost:\s*'(.+?)'/);
+   if (!urlPostMatch) throw new Error("Could not extract post URL from login page");
+   const urlPost = urlPostMatch[1]!.replace(/\\\//g, "/");
+
+   const cookies = extractCookies(pageResponse);
+
+   const loginResponse = await fetch(urlPost, {
+      method: "POST",
+      headers: {
+         "Content-Type": "application/x-www-form-urlencoded",
+         Cookie: cookies,
+      },
+      body: new URLSearchParams({
+         login: email,
+         loginfmt: email,
+         passwd: password,
+         PPFT: ppft,
+      }),
+      redirect: "manual",
+   });
+
+   let location = loginResponse.headers.get("location");
+   let allCookies = mergeCookies(cookies, extractCookies(loginResponse));
+   const maxRedirects = 10;
+
+   for (let i = 0; i < maxRedirects && location; i++) {
+      if (location.includes("access_token")) break;
+
+      const redirectResponse = await fetch(location, {
+         headers: { Cookie: allCookies },
+         redirect: "manual",
+      });
+      allCookies = mergeCookies(allCookies, extractCookies(redirectResponse));
+      location = redirectResponse.headers.get("location");
+   }
+
+   if (!location || !location.includes("access_token")) {
+      const body = await loginResponse.text().catch(() => "");
+      if (body.includes("Sign in to") || body.includes("sign in") || body.includes("incorrect")) {
+         throw new Error("Invalid email or password");
+      }
+      if (body.includes("Help us protect your account") || body.includes("identity")) {
+         throw new Error("Two-factor authentication is enabled on this account. Use the device code flow instead.");
+      }
+      throw new Error("Email/password authentication failed: could not obtain access token from redirect");
+   }
+
+   const fragment = location.split("#")[1];
+   if (!fragment) throw new Error("No token fragment found in redirect URL");
+
+   const params = new URLSearchParams(fragment);
+   const accessToken = params.get("access_token");
+   const refreshToken = params.get("refresh_token");
+   const expiresIn = params.get("expires_in");
+
+   if (!accessToken) throw new Error("No access_token in redirect response");
+
+   return {
+      accessToken: decodeURIComponent(accessToken),
+      refreshToken: refreshToken ? decodeURIComponent(refreshToken) : "",
+      expiresAt: Date.now() + (Number(expiresIn) || 86400) * 1000,
+   };
+}
+
+function extractCookies(response: Response): string {
+   const setCookies = response.headers.getSetCookie?.() ?? [];
+   return setCookies.map((c) => c.split(";")[0]).join("; ");
+}
+
+function mergeCookies(existing: string, incoming: string): string {
+   if (!incoming) return existing;
+   if (!existing) return incoming;
+   return `${existing}; ${incoming}`;
+}
+
 function sleep(ms: number): Promise<void> {
    return new Promise((resolve) => setTimeout(resolve, ms));
 }

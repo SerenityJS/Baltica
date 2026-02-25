@@ -1,14 +1,24 @@
+export type AuthFlow = "deviceCode" | "password" | "xboxToken";
+
 export interface AuthOptions {
    clientId: string;
-   deviceCode: boolean;
+   flow: AuthFlow;
    username: string;
    cacheDir: string;
    clientPublicKey?: string;
+   /** Required when flow is "password" */
+   email?: string;
+   /** Required when flow is "password" */
+   password?: string;
+   /** Required when flow is "xboxToken". Format: "XBL3.0 x={userHash};{token}" */
+   xboxToken?: string;
+   /** @deprecated Use `flow` instead */
+   deviceCode?: boolean;
 }
 
 export const defaultAuthOptions: AuthOptions = {
    clientId: "000000004C12AE6F",
-   deviceCode: true,
+   flow: "deviceCode",
    username: "default",
    cacheDir: ".baltica/auth",
 };

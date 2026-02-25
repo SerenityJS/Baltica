@@ -9,6 +9,7 @@
       "name": "@baltica/raknet-test",
       "version": "0.0.0",
       "dependencies": {
+        "@baltica/auth": "*",
         "@baltica/raknet": "*",
         "baltica": "*",
       },
@@ -23,7 +24,7 @@
     },
     "packages/baltica": {
       "name": "baltica",
-      "version": "0.0.1",
+      "version": "2.0.0",
       "dependencies": {
         "@baltica/auth": "*",
         "@baltica/raknet": "*",

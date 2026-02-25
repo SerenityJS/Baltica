@@ -40,6 +40,12 @@ export type ClientOptions = {
    loginOptions: LoginOptions;
    skinData?: Partial<SkinData>;
    skinFile?: string;
+   /** Email for password auth flow */
+   email?: string;
+   /** Password for password auth flow */
+   password?: string;
+   /** XBL3.0 token for xbox token auth flow. Format: "XBL3.0 x={userHash};{token}" */
+   xboxToken?: string;
 } & RaknetOptions;
 
 export const defaultClientOptions = {

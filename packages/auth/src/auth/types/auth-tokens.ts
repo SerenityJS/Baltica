@@ -56,7 +56,14 @@ export interface MultiplayerSessionToken {
    expiresAt: number;
 }
 
+export interface UserProfile {
+   xuid: string;
+   uuid: string;
+   username: string;
+}
+
 export interface AuthResult {
+   profile: UserProfile;
    xbl: XblToken;
    xsts: XstsToken;
    playFab: PlayFabToken;

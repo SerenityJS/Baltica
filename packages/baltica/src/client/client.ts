@@ -214,10 +214,21 @@ export class Client extends Emitter<ClientEvents> {
       this.loginData = LoginData.prepare(this.options, tempProfile);
 
       const { username, tokensFolder } = this.options;
+
+      const flow = this.options.email && this.options.password
+         ? "password" as const
+         : this.options.xboxToken
+            ? "xboxToken" as const
+            : "deviceCode" as const;
+
       const auth = new Auth({
-         username,
+         flow,
+         username: flow === "deviceCode" ? username : undefined,
          cacheDir: tokensFolder,
          clientPublicKey: this.loginData.clientX509,
+         email: this.options.email,
+         password: this.options.password,
+         xboxToken: this.options.xboxToken,
       });
 
       return new Promise((resolve, reject) => {
@@ -226,6 +237,7 @@ export class Client extends Emitter<ClientEvents> {
          });
 
          auth.on("login", async (result) => {
+            console.log(result.profile)
             this.applyAuthResult(result);
             resolve();
          });
@@ -236,23 +248,10 @@ export class Client extends Emitter<ClientEvents> {
    }
 
    private async applyAuthResult(result: any): Promise<void> {
-      let gamertag = this.options.username;
-      let xuid = "";
-      let uuid = LoginData.nextUUID(this.options.username);
-
-      for (const jwt of result.bedrockChain) {
-         try {
-            const payload = JSON.parse(
-               Buffer.from(jwt.split(".")[1]!, "base64").toString(),
-            );
-            if (payload?.extraData?.displayName) {
-               gamertag = payload.extraData.displayName;
-               xuid = payload.extraData.XUID ?? "";
-               uuid = payload.extraData.identity ?? LoginData.nextUUID(gamertag);
-               break;
-            }
-         } catch { }
-      }
+      const profile = result.profile ?? {};
+      const gamertag = profile.username || this.options.username;
+      const xuid = profile.xuid || "";
+      const uuid = profile.uuid || LoginData.nextUUID(gamertag);
 
       this.profile = { name: gamertag, uuid, xuid };
       this.loginData.payload = createDefaultPayload(this.options, this.profile);
