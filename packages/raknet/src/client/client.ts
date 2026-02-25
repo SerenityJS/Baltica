@@ -2,7 +2,7 @@ import { createSocket, Socket } from "node:dgram";
 import { randomBytes } from "node:crypto";
 import { lookup } from "node:dns/promises";
 import { Emitter } from "@baltica/utils";
-import { NetworkSession, UnconnectedPing, OpenConnectionRequestOne, Address, Priority, Status, createSocks5Relay, Socks5Relay } from "../shared";
+import { NetworkSession, UnconnectedPing, OpenConnectionRequestOne, Address, Priority, Status, Disconnect, createSocks5Relay, Socks5Relay } from "../shared";
 import { ClientEvents, ClientOptions, defaultClientOptions } from "./types";
 
 export class Client extends Emitter<ClientEvents> {
@@ -131,5 +131,12 @@ export class Client extends Emitter<ClientEvents> {
          if (this.relay) this.relay.close();
          else if (this.socket) this.socket.close();
       } catch {}
+   }
+
+   public disconnect(): void {
+      const packet = new Disconnect();
+      this.sendReliable(packet.serialize(), Priority.High);
+      this.close();
+      this.emit("disconnect");
    }
 }

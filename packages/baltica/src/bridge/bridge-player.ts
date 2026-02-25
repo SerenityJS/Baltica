@@ -70,19 +70,29 @@ export class BridgePlayer extends Emitter<BridgePlayerEvents> {
          return;
       }
 
-      const event = `${clientBound ? "client" : "server"}Bound-${PacketClass.name}` as keyof BridgePlayerEvents;
+      const direction = clientBound ? "clientBound" : "serverBound";
+      const event = `${direction}-${PacketClass.name}` as keyof BridgePlayerEvents;
+      const wildcard = `${direction}-*` as keyof BridgePlayerEvents;
 
-      if (this.listenerCount(event) > 0) {
-         const ctx = {
-            packet: new PacketClass(buffer).deserialize(),
-            cancelled: false,
-            modified: false,
-         };
+      const hasSpecific = this.listenerCount(event) > 0;
+      const hasWildcard = this.listenerCount(wildcard) > 0;
 
-         this.emit(event, ctx as any);
+      if (hasSpecific || hasWildcard) {
+         try {
+            const ctx = {
+               packet: new PacketClass(buffer).deserialize(),
+               cancelled: false,
+               modified: false,
+            };
 
-         if (ctx.cancelled) return;
-         if (ctx.modified) buffer = ctx.packet.serialize();
+            if (hasSpecific) this.emit(event, ctx as any);
+            if (hasWildcard) this.emit(wildcard, ctx as any, PacketClass.name);
+
+            if (ctx.cancelled) return;
+            if (ctx.modified) buffer = ctx.packet.serialize();
+         } catch {
+            // Deserialization failed — forward the raw buffer as-is
+         }
       }
 
       if (clientBound) this.player.send(buffer);

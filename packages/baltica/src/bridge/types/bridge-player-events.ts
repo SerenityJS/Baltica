@@ -11,4 +11,7 @@ export type BridgePlayerEvents = {
    [K in PacketNames as `clientBound-${K}`]: [signal: BridgePacketSignal<InstanceType<(typeof Protocol)[K]>>];
 } & {
    [K in PacketNames as `serverBound-${K}`]: [signal: BridgePacketSignal<InstanceType<(typeof Protocol)[K]>>];
+} & {
+   "clientBound-*": [signal: BridgePacketSignal<Protocol.DataPacket>, name: string];
+   "serverBound-*": [signal: BridgePacketSignal<Protocol.DataPacket>, name: string];
 };

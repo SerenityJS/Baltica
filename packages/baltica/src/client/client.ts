@@ -182,6 +182,16 @@ export class Client extends Emitter<ClientEvents> {
       this.removeAllListeners();
    }
 
+   public disconnect(reason = "client disconnect"): void {
+      try {
+         const packet = new (Packets[Packet.Disconnect] as any)();
+         this.send(packet.serialize());
+      } catch { }
+      this.raknet.disconnect();
+      this.removeAllListeners();
+      this.emit("disconnect", reason);
+   }
+
    private async authenticate(): Promise<void> {
       if (this.options.offline) {
          return this.authenticateOffline();
