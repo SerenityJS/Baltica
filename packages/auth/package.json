@@ -1,6 +1,6 @@
 {
   "name": "@baltica/auth",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "Authentication package for Baltica",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -10,7 +10,7 @@
     "clean": "rimraf dist"
   },
   "dependencies": {
-    "@baltica/utils": "*",
+    "@baltica/utils": "workspace:*",
     "@types/node": "^25.3.0"
   },
   "files": [

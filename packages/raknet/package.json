@@ -1,6 +1,6 @@
 {
   "name": "@baltica/raknet",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "RakNet implementation for Baltica",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -16,7 +16,7 @@
     "access": "public"
   },
   "dependencies": {
-    "@baltica/utils": "*",
+    "@baltica/utils": "workspace:*",
     "@serenityjs/binarystream": "^3.1.0"
   },
   "devDependencies": {

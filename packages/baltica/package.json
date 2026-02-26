@@ -1,6 +1,6 @@
 {
   "name": "baltica",
-  "version": "2.0.3",
+  "version": "2.0.4",
   "description": "Core baltica package",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -10,9 +10,9 @@
     "clean": "rimraf dist"
   },
   "dependencies": {
-    "@baltica/auth": "*",
-    "@baltica/raknet": "*",
-    "@baltica/utils": "*",
+    "@baltica/auth": "workspace:*",
+    "@baltica/raknet": "workspace:*",
+    "@baltica/utils": "workspace:*",
     "@serenityjs/protocol": "^0.8.18",
     "jose": "^6.1.3"
   },
