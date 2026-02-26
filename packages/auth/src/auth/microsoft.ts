@@ -151,6 +151,7 @@ export async function authenticateWithPassword(
 
    let location = loginResponse.headers.get("location");
    let allCookies = mergeCookies(cookies, extractCookies(loginResponse));
+   let lastRedirectBody = "";
    const maxRedirects = 10;
 
    for (let i = 0; i < maxRedirects && location; i++) {
@@ -161,18 +162,56 @@ export async function authenticateWithPassword(
          redirect: "manual",
       });
       allCookies = mergeCookies(allCookies, extractCookies(redirectResponse));
-      location = redirectResponse.headers.get("location");
+
+      const nextLocation = redirectResponse.headers.get("location");
+      if (!nextLocation) {
+         // No more redirects — capture the final page body for error detection
+         lastRedirectBody = await redirectResponse.text().catch(() => "");
+      }
+      location = nextLocation ?? location;
    }
 
    if (!location || !location.includes("access_token")) {
-      const body = await loginResponse.text().catch(() => "");
-      if (body.includes("Sign in to") || body.includes("sign in") || body.includes("incorrect")) {
+      const body = lastRedirectBody || await loginResponse.text().catch(() => "");
+      const lastUrl = location ?? "";
+
+      // Identity confirmation / account protection (captcha, email code, phone, etc.)
+      if (
+         lastUrl.includes("identity/confirm") ||
+         body.includes("identity/confirm") ||
+         body.includes("Help us protect your account") ||
+         body.includes("account.live.com/identity")
+      ) {
+         throw new Error(
+            "Microsoft requires identity verification for this account. " +
+            "Complete the verification at https://login.live.com in a browser, or use the device code flow instead.",
+         );
+      }
+
+      // Two-factor / two-step verification
+      if (
+         lastUrl.includes("LiveTwoStepVerification") ||
+         body.includes("two-step verification") ||
+         body.includes("2FA")
+      ) {
+         throw new Error(
+            "Two-factor authentication is enabled on this account. Use the device code flow instead.",
+         );
+      }
+
+      // Actual bad credentials
+      if (
+         body.includes("Sign in to") ||
+         body.includes("sign in") ||
+         body.includes("incorrect") ||
+         body.includes("That Microsoft account doesn")
+      ) {
          throw new Error("Invalid email or password");
       }
-      if (body.includes("Help us protect your account") || body.includes("identity")) {
-         throw new Error("Two-factor authentication is enabled on this account. Use the device code flow instead.");
-      }
-      throw new Error("Email/password authentication failed: could not obtain access token from redirect");
+
+      throw new Error(
+         "Email/password authentication failed: could not obtain access token from redirect",
+      );
    }
 
    const fragment = location.split("#")[1];

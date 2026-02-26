@@ -128,7 +128,7 @@ client.on("MovePlayerPacket", (packet) => {
 
 ## Protocol Version
 
-Currently targets Bedrock `1.26.1` (protocol `924`).
+Currently targets Bedrock `1.26.1` and `1.21.2` (protocol `924`).
 
 ## Project Structure
 
