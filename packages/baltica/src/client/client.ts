@@ -178,14 +178,20 @@ export class Client extends Emitter<ClientEvents> {
    }
 
    public close(): void {
-      try { this.raknet.close(); } catch { }
+      try { 
+         if (this.raknet && typeof this.raknet.close === "function") {
+            this.raknet.close();
+         }
+      } catch { }
       this.removeAllListeners();
    }
 
    public disconnect(reason = "client disconnect"): void {
       this.emit("disconnect", reason);
       setTimeout(() => {
-         this.raknet.disconnect();
+         if (this.raknet && typeof this.raknet.disconnect === "function") {
+            this.raknet.disconnect();
+         }
          this.removeAllListeners();
       }, 50);
    }
