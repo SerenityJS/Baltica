@@ -64,12 +64,25 @@ export class NetworkSession extends Emitter<NetworkEvents> {
    private retransmitTimer?: ReturnType<typeof setTimeout>;
    private cleanupTimer?: ReturnType<typeof setTimeout>;
    private lastCleanup = 0;
+   private keepaliveTimer?: ReturnType<typeof setTimeout>;
 
    constructor(mtu: number, client: boolean) {
       super();
       this.mtu = mtu;
       this.client = client;
       for (let i = 0; i < 32; i++) this.inputOrderingQueue.set(i, new Map());
+      this.startKeepalive();
+   }
+
+   private startKeepalive(): void {
+      if (this.keepaliveTimer) clearTimeout(this.keepaliveTimer);
+      const interval = this.status === Status.Connected ? 10 : 
+                       this.status === Status.Connecting ? 10 : 100;
+      this.keepaliveTimer = setTimeout(() => {
+         this.tick();
+         this.startKeepalive();
+      }, interval);
+      this.keepaliveTimer.ref();
    }
 
    sendOfflineWithRetry(data: Buffer): void {
@@ -77,6 +90,7 @@ export class NetworkSession extends Emitter<NetworkEvents> {
       this.send(data);
       if (!this.retransmitTimer) {
          this.retransmitTimer = setTimeout(() => this.tick(), this.retransmitInterval);
+         this.retransmitTimer.ref();
       }
    }
 
@@ -89,9 +103,11 @@ export class NetworkSession extends Emitter<NetworkEvents> {
    }
 
    destroy(): void {
+      this.status = Status.Disconnected;
       if (this.ackTimer) clearTimeout(this.ackTimer);
       if (this.retransmitTimer) clearTimeout(this.retransmitTimer);
       if (this.cleanupTimer) clearTimeout(this.cleanupTimer);
+      if (this.keepaliveTimer) clearTimeout(this.keepaliveTimer);
       this.removeAllListeners();
    }
 
@@ -256,7 +272,7 @@ export class NetworkSession extends Emitter<NetworkEvents> {
    }
 
    tick(): void {
-      if (this.status === Status.Disconnected) return;
+      if (this.status === Status.Disconnected || !this.send) return;
       const now = Date.now();
       
       if (this.offlineRetry) {
@@ -273,6 +289,7 @@ export class NetworkSession extends Emitter<NetworkEvents> {
             this.send(r.data);
             if (this.retransmitTimer) clearTimeout(this.retransmitTimer);
             this.retransmitTimer = setTimeout(() => this.tick(), r.interval);
+            this.retransmitTimer.ref();
             return;
          }
       }
@@ -333,6 +350,7 @@ export class NetworkSession extends Emitter<NetworkEvents> {
       if (nextRetransmit < Infinity) {
          if (this.retransmitTimer) clearTimeout(this.retransmitTimer);
          this.retransmitTimer = setTimeout(() => this.tick(), nextRetransmit);
+         this.retransmitTimer.ref();
       }
    }
 
@@ -412,7 +430,7 @@ export class NetworkSession extends Emitter<NetworkEvents> {
    }
 
    private flush(): void {
-      if (this.outputFrames.size === 0) return;
+      if (this.outputFrames.size === 0 || !this.send) return;
       const fs = new FrameSet();
       fs.sequence = this.outputSequence++;
       fs.frames = [...this.outputFrames];
@@ -423,6 +441,7 @@ export class NetworkSession extends Emitter<NetworkEvents> {
       
       if (!this.retransmitTimer) {
          this.retransmitTimer = setTimeout(() => this.tick(), this.retransmitInterval);
+         this.retransmitTimer.ref();
       }
    }
 
@@ -444,6 +463,7 @@ export class NetworkSession extends Emitter<NetworkEvents> {
             this.ackTimer = undefined;
             this.tick();
          }, 10);
+         this.ackTimer.ref();
       }
    }
 

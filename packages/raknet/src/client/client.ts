@@ -51,6 +51,7 @@ export class Client extends Emitter<ClientEvents> {
 
    private initDirect(): Promise<void> {
       this.socket = createSocket(this.options.family);
+      this.socket.ref();
       this.network.send = (data) => this.socket.send(data, this.options.port, this.options.address);
       return new Promise((resolve) => {
          try {
