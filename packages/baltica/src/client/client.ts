@@ -302,6 +302,9 @@ export class Client extends Emitter<ClientEvents> {
          }
       } catch (err) {
          Logger.error("Failed to decompress packet", err);
+         if (err instanceof Error && err.message.includes("Checksum mismatch")) {
+            this.disconnect("Encryption checksum mismatch: Connection corrupted");
+         }
       }
    }
 

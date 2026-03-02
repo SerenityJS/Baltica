@@ -156,6 +156,9 @@ export class Player extends Emitter<PlayerEvents> {
          }
       } catch (err) {
          Logger.error("Failed to decompress packet", err);
+         if (err instanceof Error && err.message.includes("Checksum mismatch")) {
+            this.disconnect("Encryption checksum mismatch: Connection corrupted");
+         }
       }
    }
 
@@ -207,4 +210,12 @@ export class Player extends Emitter<PlayerEvents> {
       framed.copy(buf, 1);
       this.connection.send(buf, priority);
    }
+
+
+   public disconnect(reason = "disconnected"): void {
+      Logger.info(`Disconnecting ${this.username || "player"}: ${reason}`);
+      this.connection.disconnect();
+      this.emit("disconnect");
+   }
+
 }

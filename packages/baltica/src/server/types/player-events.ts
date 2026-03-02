@@ -6,5 +6,6 @@ export type PlayerEvents = {
 } & {
    packet: [Protocol.DataPacket];
    login: [];
+   disconnect: [];
    error: [Error];
 };

@@ -16,7 +16,7 @@
     },
     "packages/auth": {
       "name": "@baltica/auth",
-      "version": "0.0.1",
+      "version": "0.0.5",
       "dependencies": {
         "@baltica/utils": "*",
         "@types/node": "^25.3.0",
@@ -24,7 +24,7 @@
     },
     "packages/baltica": {
       "name": "baltica",
-      "version": "2.0.0",
+      "version": "2.0.6",
       "dependencies": {
         "@baltica/auth": "*",
         "@baltica/raknet": "*",
@@ -38,7 +38,7 @@
     },
     "packages/raknet": {
       "name": "@baltica/raknet",
-      "version": "0.0.1",
+      "version": "0.0.6",
       "dependencies": {
         "@baltica/utils": "*",
         "@serenityjs/binarystream": "^3.1.0",
@@ -94,5 +94,7 @@
     "reflect-metadata": ["reflect-metadata@0.2.2", "", {}, "sha512-urBwgfrvVP/eAyXx4hluJivBKzuEbSQs9rKWCrCkbSxNv8mxPcUZKeuoF3Uy4mJl3Lwprp6yy5/39VWigZ4K6Q=="],
 
     "undici-types": ["undici-types@7.18.2", "", {}, "sha512-AsuCzffGHJybSaRrmr5eHr81mwJU3kjw6M+uprWvCXiNeN9SOGwQ3Jn8jb8m3Z6izVgknn1R0FTCEAP2QrLY/w=="],
+
+    "baltica/@types/node": ["@types/node@25.3.3", "", { "dependencies": { "undici-types": "~7.18.0" } }, "sha512-DpzbrH7wIcBaJibpKo9nnSQL0MTRdnWttGyE5haGwK86xgMOkFLp7vEyfQPGLOJh5wNYiJ3V9PmUMDhV9u8kkQ=="],
   }
 }
