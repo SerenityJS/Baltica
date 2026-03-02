@@ -8,7 +8,6 @@ import { ClientEvents, ClientOptions, defaultClientOptions } from "./types";
 export class Client extends Emitter<ClientEvents> {
    private socket!: Socket;
    private network: NetworkSession;
-   private tickInterval?: ReturnType<typeof setInterval>;
    private relay?: Socks5Relay;
    public options: ClientOptions;
 
@@ -48,7 +47,6 @@ export class Client extends Emitter<ClientEvents> {
       const targetPort = this.network.address.port;
       this.network.send = (data) => this.relay!.send(data, targetAddress, targetPort);
       this.relay.onMessage((data) => this.network.receive(data));
-      this.tickInterval = setInterval(() => this.network.tick(), 50);
    }
 
    private initDirect(): Promise<void> {
@@ -58,13 +56,11 @@ export class Client extends Emitter<ClientEvents> {
          try {
             this.socket.address();
             this.socket.on("message", (buf) => this.network.receive(buf));
-            this.tickInterval = setInterval(() => this.network.tick(), 50);
             resolve();
          } catch {
             this.socket.bind();
             this.socket.on("listening", () => {
                this.socket.on("message", (buf) => this.network.receive(buf));
-               this.tickInterval = setInterval(() => this.network.tick(), 50);
                resolve();
             });
          }
@@ -120,10 +116,7 @@ export class Client extends Emitter<ClientEvents> {
    }
 
    public close(): void {
-      if (this.tickInterval) {
-         clearInterval(this.tickInterval);
-         this.tickInterval = undefined;
-      }
+      this.network.destroy();
       this.network.status = Status.Disconnected;
       this.network.send = () => {};
       this.network.removeAllListeners();

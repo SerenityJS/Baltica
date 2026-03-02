@@ -59,6 +59,11 @@ export class NetworkSession extends Emitter<NetworkEvents> {
    private highestReliableIndex = -1;
    private offlineRetry: { data: Buffer; attempts: number; maxAttempts: number; lastSent: number; interval: number } | null = null;
    private outputBackupTimestamps = new Map<number, number>();
+   
+   private ackTimer?: ReturnType<typeof setTimeout>;
+   private retransmitTimer?: ReturnType<typeof setTimeout>;
+   private cleanupTimer?: ReturnType<typeof setTimeout>;
+   private lastCleanup = 0;
 
    constructor(mtu: number, client: boolean) {
       super();
@@ -70,10 +75,24 @@ export class NetworkSession extends Emitter<NetworkEvents> {
    sendOfflineWithRetry(data: Buffer): void {
       this.offlineRetry = { data, attempts: 1, maxAttempts: this.maxRetransmit, lastSent: Date.now(), interval: this.retransmitInterval };
       this.send(data);
+      if (!this.retransmitTimer) {
+         this.retransmitTimer = setTimeout(() => this.tick(), this.retransmitInterval);
+      }
    }
 
    private clearOfflineRetry(): void {
       this.offlineRetry = null;
+      if (this.retransmitTimer) {
+         clearTimeout(this.retransmitTimer);
+         this.retransmitTimer = undefined;
+      }
+   }
+
+   destroy(): void {
+      if (this.ackTimer) clearTimeout(this.ackTimer);
+      if (this.retransmitTimer) clearTimeout(this.retransmitTimer);
+      if (this.cleanupTimer) clearTimeout(this.cleanupTimer);
+      this.removeAllListeners();
    }
 
    receive(buffer: Buffer): void {
@@ -239,6 +258,7 @@ export class NetworkSession extends Emitter<NetworkEvents> {
    tick(): void {
       if (this.status === Status.Disconnected) return;
       const now = Date.now();
+      
       if (this.offlineRetry) {
          const r = this.offlineRetry;
          if (now - r.lastSent >= r.interval) {
@@ -246,40 +266,52 @@ export class NetworkSession extends Emitter<NetworkEvents> {
                this.offlineRetry = null;
                this.status = Status.Disconnected;
                this.emit("error", new Error("Connection timed out after " + r.maxAttempts + " attempts"));
-            } else {
-               r.attempts++;
-               r.lastSent = now;
-               this.send(r.data);
+               return;
             }
+            r.attempts++;
+            r.lastSent = now;
+            this.send(r.data);
+            if (this.retransmitTimer) clearTimeout(this.retransmitTimer);
+            this.retransmitTimer = setTimeout(() => this.tick(), r.interval);
+            return;
          }
       }
-      const windowStart = this.lastInputSequence - RECEIVE_WINDOW;
-      if (windowStart > 0) {
-         for (const s of this.receivedFrameSequences) if (s < windowStart) this.receivedFrameSequences.delete(s);
-         for (const s of this.lostFrameSequences) if (s < windowStart) this.lostFrameSequences.delete(s);
+
+      if (now - this.lastCleanup > 5000) {
+         this.lastCleanup = now;
+         const windowStart = this.lastInputSequence - RECEIVE_WINDOW;
+         if (windowStart > 0) {
+            for (const s of this.receivedFrameSequences) if (s < windowStart) this.receivedFrameSequences.delete(s);
+            for (const s of this.lostFrameSequences) if (s < windowStart) this.lostFrameSequences.delete(s);
+         }
+         const relStart = this.highestReliableIndex - RELIABLE_WINDOW;
+         if (relStart > 0) {
+            for (const i of this.receivedReliableFrameIndices) if (i < relStart) this.receivedReliableFrameIndices.delete(i);
+         }
+         for (const [id, entry] of this.fragmentsQueue) {
+            if (now - entry.timestamp > FRAGMENT_TIMEOUT) this.fragmentsQueue.delete(id);
+         }
       }
-      const relStart = this.highestReliableIndex - RELIABLE_WINDOW;
-      if (relStart > 0) {
-         for (const i of this.receivedReliableFrameIndices) if (i < relStart) this.receivedReliableFrameIndices.delete(i);
+
+      if (this.pendingAcks.size > 0 || this.lostFrameSequences.size > 0) {
+         if (this.pendingAcks.size > 0) {
+            const ack = new Ack();
+            ack.sequences = [...this.pendingAcks];
+            this.pendingAcks.clear();
+            this.send(ack.serialize());
+         }
+         if (this.lostFrameSequences.size > 0) {
+            const nack = new Nack();
+            nack.sequences = [...this.lostFrameSequences];
+            this.lostFrameSequences.clear();
+            this.send(nack.serialize());
+         }
       }
-      for (const [id, entry] of this.fragmentsQueue) {
-         if (now - entry.timestamp > FRAGMENT_TIMEOUT) this.fragmentsQueue.delete(id);
-      }
-      if (this.pendingAcks.size > 0) {
-         const ack = new Ack();
-         ack.sequences = [...this.pendingAcks];
-         this.pendingAcks.clear();
-         this.send(ack.serialize());
-      }
-      if (this.lostFrameSequences.size > 0) {
-         const nack = new Nack();
-         nack.sequences = [...this.lostFrameSequences];
-         this.lostFrameSequences.clear();
-         this.send(nack.serialize());
-      }
-      // Retransmit unacked frame sets that are older than the retry interval
+
+      let nextRetransmit = Infinity;
       for (const [seq, sentAt] of this.outputBackupTimestamps) {
-         if (now - sentAt >= this.retransmitInterval) {
+         const age = now - sentAt;
+         if (age >= this.retransmitInterval) {
             const frames = this.outputBackup.get(seq);
             if (frames) {
                const fs = new FrameSet();
@@ -287,18 +319,31 @@ export class NetworkSession extends Emitter<NetworkEvents> {
                fs.frames = frames;
                this.send(fs.serialize());
                this.outputBackupTimestamps.set(seq, now);
+               nextRetransmit = Math.min(nextRetransmit, this.retransmitInterval);
             } else {
                this.outputBackupTimestamps.delete(seq);
             }
+         } else {
+            nextRetransmit = Math.min(nextRetransmit, this.retransmitInterval - age);
          }
       }
+
       if (this.outputFrames.size > 0) this.flush();
+
+      if (nextRetransmit < Infinity) {
+         if (this.retransmitTimer) clearTimeout(this.retransmitTimer);
+         this.retransmitTimer = setTimeout(() => this.tick(), nextRetransmit);
+      }
    }
 
    private onAck(ack: Ack): void {
       for (const seq of ack.sequences) {
          this.outputBackup.delete(seq);
          this.outputBackupTimestamps.delete(seq);
+      }
+      if (this.outputBackupTimestamps.size === 0 && this.retransmitTimer) {
+         clearTimeout(this.retransmitTimer);
+         this.retransmitTimer = undefined;
       }
    }
 
@@ -374,8 +419,11 @@ export class NetworkSession extends Emitter<NetworkEvents> {
       this.outputBackup.set(fs.sequence, fs.frames);
       this.outputBackupTimestamps.set(fs.sequence, Date.now());
       this.outputFrames.clear();
-      const serialized = fs.serialize();
-      this.send(serialized);
+      this.send(fs.serialize());
+      
+      if (!this.retransmitTimer) {
+         this.retransmitTimer = setTimeout(() => this.tick(), this.retransmitInterval);
+      }
    }
 
    private onFrameSet(fs: FrameSet): void {
@@ -390,6 +438,13 @@ export class NetworkSession extends Emitter<NetworkEvents> {
          this.lastInputSequence = fs.sequence;
       }
       for (const frame of fs.frames) this.handleFrame(frame);
+      
+      if (!this.ackTimer) {
+         this.ackTimer = setTimeout(() => {
+            this.ackTimer = undefined;
+            this.tick();
+         }, 10);
+      }
    }
 
    private handleFrame(frame: Frame): void {

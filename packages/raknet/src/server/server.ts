@@ -14,7 +14,6 @@ const RAKNET_PROTOCOL = 11;
 
 export class Server extends Emitter<ServerEvents> {
    private socket: Socket;
-   private tickInterval?: ReturnType<typeof setInterval>;
    private connections = new Map<string, Connection>();
    public options: ServerOptions;
 
@@ -33,14 +32,12 @@ export class Server extends Emitter<ServerEvents> {
          this.socket.bind(this.options.port, this.options.address);
          this.socket.on("listening", () => {
             this.socket.on("message", (buffer, rinfo) => this.handleMessage(buffer, rinfo));
-            this.tickInterval = setInterval(() => this.tick(), 50);
             resolve();
          });
       });
    }
 
    public stop(): void {
-      if (this.tickInterval) clearInterval(this.tickInterval);
       for (const conn of this.connections.values()) conn.disconnect();
       this.connections.clear();
       this.socket.close();

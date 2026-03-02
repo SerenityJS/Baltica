@@ -14,4 +14,5 @@ export type BridgePlayerEvents = {
 } & {
    "clientBound-*": [signal: BridgePacketSignal<Protocol.DataPacket>, name: string];
    "serverBound-*": [signal: BridgePacketSignal<Protocol.DataPacket>, name: string];
+   "*": [signal: BridgePacketSignal<Protocol.DataPacket>, name: string];
 };

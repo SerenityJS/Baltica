@@ -8,6 +8,7 @@ import { Server } from "../server";
 import { BridgePlayer } from "./bridge-player";
 import { type BridgeOptions, defaultBridgeOptions } from "./types";
 import type { BridgeEvents } from "./types/bridge-events";
+import { Priority } from "@baltica/raknet";
 
 export class Bridge extends Emitter<BridgeEvents> {
    public options: BridgeOptions;
@@ -42,7 +43,7 @@ export class Bridge extends Emitter<BridgeEvents> {
          packet.hideDisconnectScreen = false;
          packet.message = new DisconnectMessage("Client leaving", "");
          packet.reason = DisconnectReason.LegacyDisconnect;
-         player.client?.send(packet.serialize());
+         player.client?.send(packet.serialize(), Priority.High);
       } catch {}
 
       this.emit("disconnect", player);

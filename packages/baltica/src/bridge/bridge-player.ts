@@ -9,6 +9,7 @@ import { Client } from "../client";
 import type { Player } from "../server";
 import type { Bridge } from "./bridge";
 import type { BridgePlayerEvents } from "./types";
+import { Priority } from "@baltica/raknet";
 
 export class BridgePlayer extends Emitter<BridgePlayerEvents> {
    public bridge: Bridge;
@@ -72,14 +73,16 @@ export class BridgePlayer extends Emitter<BridgePlayerEvents> {
       const direction = clientBound ? "clientBound" : "serverBound";
       const event = `${direction}-${PacketClass.name}` as keyof BridgePlayerEvents;
       const wildcard = `${direction}-*` as keyof BridgePlayerEvents;
+      const completeWildCard = `*` as keyof BridgePlayerEvents;
 
       const hasSpecific = this.listenerCount(event) > 0;
       const hasWildcard = this.listenerCount(wildcard) > 0;
+      const hasCompleteWildCard = this.listenerCount(completeWildCard) > 0;
 
       let cancelled = false;
       let outBuffer = rawBuffer;
 
-      if (hasSpecific || hasWildcard) {
+      if (hasSpecific || hasWildcard || hasCompleteWildCard) {
          let deserialized: any = null;
          const ctx = {
             get packet() {
@@ -97,6 +100,7 @@ export class BridgePlayer extends Emitter<BridgePlayerEvents> {
          try {
             if (hasSpecific) this.emit(event, ctx as any);
             if (hasWildcard) this.emit(wildcard, ctx as any, PacketClass.name);
+            if (hasCompleteWildCard) this.emit(completeWildCard, ctx as any, PacketClass.name);
          } catch { }
 
          cancelled = ctx.cancelled;
@@ -106,7 +110,7 @@ export class BridgePlayer extends Emitter<BridgePlayerEvents> {
       }
 
       if (cancelled) return;
-      if (clientBound) this.player.send(outBuffer);
-      else this.client.send(outBuffer);
+      if (clientBound) this.player.send(outBuffer, Priority.High);
+      else this.client.send(outBuffer, Priority.High);
    }
 }
