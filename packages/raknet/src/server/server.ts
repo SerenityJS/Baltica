@@ -27,6 +27,14 @@ export class Server extends Emitter<ServerEvents> {
       return `${rinfo.address}:${rinfo.port}`;
    }
 
+   public get message(): string {
+      return this.options.message;
+   }
+
+   public set message(value: string) {
+      this.options.message = value;
+   }
+
    public async start(): Promise<void> {
       return new Promise((resolve) => {
          this.socket.bind(this.options.port, this.options.address);

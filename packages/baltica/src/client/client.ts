@@ -51,13 +51,12 @@ export class Client extends Emitter<ClientEvents> {
       this.requestNetworkSettings();
 
       return new Promise((resolve, reject) => {
-         this.on("SetLocalPlayerAsInitializedPacket", () => {
+         this.once("SetLocalPlayerAsInitializedPacket", () => {
             resolve();
-            this.emit("spawn");
             this.emit("connect");
          });
 
-         this.on("disconnect", (reason) => {
+         this.once("disconnect", (reason) => {
             reject(new Error(`Disconnected during login: ${reason}`));
          });
       });
@@ -146,10 +145,18 @@ export class Client extends Emitter<ClientEvents> {
       radius.radius = this.options.viewDistance;
       radius.maxRadius = this.options.viewDistance;
       this.send(radius.serialize());
+      
+
+      const loadingScreen = new ServerboundLoadingScreenPacketPacket();
+      loadingScreen.type = ServerboundLoadingScreenType.StartLoadingScreen;
+      loadingScreen.hasScreenId = false;
+
+      this.send(loadingScreen.serialize());
    }
 
    private onPlayStatus(packet: PlayStatusPacket): void {
       if (packet.status !== PlayStatus.PlayerSpawn) return;
+      this.emit("spawn"); // Spawn is just spawning. not fully connected yet
 
       const init = new SetLocalPlayerAsInitializedPacket();
       init.runtimeEntityId = this.startGameData.runtimeEntityId;
@@ -179,7 +186,7 @@ export class Client extends Emitter<ClientEvents> {
    }
 
    public close(): void {
-      try { 
+      try {
          if (this.raknet && typeof this.raknet.close === "function") {
             this.raknet.close();
          }
@@ -308,7 +315,11 @@ export class Client extends Emitter<ClientEvents> {
       try {
          const decompressed = this.packetCompressor.decompress(packet);
          for (const packet of decompressed) {
-            this.handlePacket(packet);
+            try {
+               this.handlePacket(packet);
+            } catch (err) {
+               Logger.error("Failed to handle packet", err);
+            }
          }
       } catch (err) {
          Logger.error("Failed to decompress packet", err);
@@ -328,7 +339,11 @@ export class Client extends Emitter<ClientEvents> {
 
       if (this.listenerCount(PacketClass.name as PacketNames) > 0) {
          const deserialized = new PacketClass(buffer).deserialize();
-         this.emit(PacketClass.name as PacketNames, deserialized);
+         try {
+            this.emit(PacketClass.name as PacketNames, deserialized);
+         } catch (err) {
+            Logger.error(`Error in packet handler for ${PacketClass.name}:`, err);
+         }
       }
    }
 

@@ -101,6 +101,22 @@ export class Player extends Emitter<PlayerEvents> {
          } catch { }
       }
 
+      // New client versions use Token instead of Certificate chain.
+      // The Token JWT payload contains cpk (client public key), xname, and xid.
+      if (!identityPublicKey) {
+         const token = identity.Token ?? identity.token;
+         if (token) {
+            try {
+               const payload = JSON.parse(
+                  Buffer.from(token.split(".")[1]!, "base64").toString(),
+               );
+               if (payload?.cpk) identityPublicKey = payload.cpk;
+               if (payload?.xname && !displayName) displayName = payload.xname;
+               if (payload?.xid && !xuid) xuid = payload.xid;
+            } catch { }
+         }
+      }
+
       this.username = displayName;
       this.xuid = xuid;
 

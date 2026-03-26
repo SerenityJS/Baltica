@@ -217,6 +217,7 @@ export class LoginData {
                displayName: profile.name,
                identity: profile.uuid,
                titleId: "89692877",
+               sandboxId: "",
                XUID: "",
             },
             certificateAuthority: true,

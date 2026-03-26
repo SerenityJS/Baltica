@@ -14,8 +14,6 @@ const MTU_HEADER_SIZE = 36;
 const RECEIVE_WINDOW = 2048;
 const RELIABLE_WINDOW = 4096;
 const FRAGMENT_TIMEOUT = 30_000;
-const ORDER_QUEUE_MAX = 4096; 
-const ORDER_SKIP_THRESHOLD = 8192;
 const RAKNET_PROTOCOL = 11;
 const GAME_PACKET_ID = 0xfe;
 
@@ -57,6 +55,8 @@ export class NetworkSession extends Emitter<NetworkEvents> {
    private inputOrderingQueue = new Map<number, Map<number, Frame>>();
    private receivedReliableFrameIndices = new Set<number>();
    private highestReliableIndex = -1;
+   public staleTimeout = 60_000;
+   private lastReceivedAt = Date.now();
    private offlineRetry: { data: Buffer; attempts: number; maxAttempts: number; lastSent: number; interval: number } | null = null;
    private outputBackupTimestamps = new Map<number, number>();
    
@@ -112,6 +112,7 @@ export class NetworkSession extends Emitter<NetworkEvents> {
    }
 
    receive(buffer: Buffer): void {
+      this.lastReceivedAt = Date.now();
       const id = buffer[0]!;
       const payload = buffer.subarray(1);
       if (id === Packet.Ack) return this.onAck(new Ack(payload).deserialize());
@@ -274,6 +275,12 @@ export class NetworkSession extends Emitter<NetworkEvents> {
    tick(): void {
       if (this.status === Status.Disconnected || !this.send) return;
       const now = Date.now();
+
+      if (this.status === Status.Connected && now - this.lastReceivedAt > this.staleTimeout) {
+         this.status = Status.Disconnected;
+         this.emit("disconnect");
+         return;
+      }
       
       if (this.offlineRetry) {
          const r = this.offlineRetry;
@@ -530,15 +537,8 @@ export class NetworkSession extends Emitter<NetworkEvents> {
          }
          this.inputOrderIndex[ch] = next;
       } else if (frame.orderedFrameIndex > expected) {
-         if (frame.orderedFrameIndex - expected > ORDER_SKIP_THRESHOLD) {
-            const queue = this.inputOrderingQueue.get(ch);
-            if (queue) queue.clear();
-            this.inputOrderIndex[ch] = frame.orderedFrameIndex + 1;
-            this.handleOnlinePacket(frame.payload);
-            return;
-         }
          const queue = this.inputOrderingQueue.get(ch)!;
-         if (queue.size < ORDER_QUEUE_MAX) queue.set(frame.orderedFrameIndex, frame);
+         queue.set(frame.orderedFrameIndex, frame);
       }
    }
 }
