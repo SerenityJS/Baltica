@@ -2,7 +2,9 @@
 
 Baltica is a TypeScript toolkit for Minecraft Bedrock Edition. It provides a client, server, and bridge (proxy) for building bots, inspecting packets, and working with vanilla gameplay.
 
-Built on Bun. Uses a custom RakNet implementation with SOCKS5 proxy support.
+Built on Bun. Uses a custom RakNet implementation with SOCKS5 proxy support and Email + Password authentication, but still supports OATH2!.
+
+[Join our Discord server!](https://discord.gg/cZ2Tz5Ne)
 
 ## Packages
 
