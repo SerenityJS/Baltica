@@ -12,11 +12,22 @@ import { PacketCompressor, PacketEncryptor } from "../shared";
 import { type PacketNames } from "../shared/types";
 import type { PlayerEvents } from "./types";
 import type { Server } from "./server";
+import {
+   decodeJwtPayload,
+   summarizeUnknownClientPayloadFields,
+   summarizeUnknownIdentityPayloadFields,
+   summarizeUnknownTokenPayloadFields,
+} from "./login-payload";
 
 const SALT = "\u{1F9C2}";
 const SALT_BUFFER = Buffer.from(SALT);
 const CURVE = "secp384r1";
 const ALGORITHM = "ES384";
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+   return value as Record<string, unknown>;
+}
 
 export class Player extends Emitter<PlayerEvents> {
    public packetCompressor: PacketCompressor;
@@ -82,20 +93,44 @@ export class Player extends Emitter<PlayerEvents> {
       const certData = JSON.parse(identity.Certificate ?? identity.certificate ?? "{}");
       const chain: string[] = certData.chain ?? [];
 
+
+      // console.log(packet);
+
       let displayName = "";
       let xuid = "";
       let identityPublicKey = "";
+      const clientPayload = decodeJwtPayload(packet.tokens.client);
+
+      if (clientPayload) {
+         // console.log("Login client data payload:", clientPayload);
+         // Logger.debug("Login client data payload:", clientPayload);
+
+         const unknownFields = summarizeUnknownClientPayloadFields(clientPayload);
+         if (unknownFields.length > 0) {
+            Logger.warn(`Unparsed client login payload fields: ${unknownFields.join(", ")}`);
+         }
+      } else {
+         Logger.warn("Failed to decode client data login payload");
+      }
 
       for (const jwt of chain) {
          try {
-            const payload = JSON.parse(
-               Buffer.from(jwt.split(".")[1]!, "base64").toString(),
-            );
-            if (payload?.extraData?.displayName) {
-               displayName = payload.extraData.displayName;
-               xuid = payload.extraData.XUID ?? "";
+            const payload = decodeJwtPayload(jwt);
+            if (!payload) continue;
+
+            Logger.debug("Login identity payload:", payload);
+
+            const unknownFields = summarizeUnknownIdentityPayloadFields(payload);
+            if (unknownFields.length > 0) {
+               Logger.warn(`Unparsed identity login payload fields: ${unknownFields.join(", ")}`);
             }
-            if (payload?.identityPublicKey) {
+
+            const extraData = asRecord(payload.extraData);
+            if (typeof extraData?.displayName === "string") {
+               displayName = extraData.displayName;
+               xuid = typeof extraData.XUID === "string" ? extraData.XUID : "";
+            }
+            if (typeof payload.identityPublicKey === "string") {
                identityPublicKey = payload.identityPublicKey;
             }
          } catch { }
@@ -107,12 +142,22 @@ export class Player extends Emitter<PlayerEvents> {
          const token = identity.Token ?? identity.token;
          if (token) {
             try {
-               const payload = JSON.parse(
-                  Buffer.from(token.split(".")[1]!, "base64").toString(),
-               );
-               if (payload?.cpk) identityPublicKey = payload.cpk;
-               if (payload?.xname && !displayName) displayName = payload.xname;
-               if (payload?.xid && !xuid) xuid = payload.xid;
+               const payload = decodeJwtPayload(token);
+               if (!payload) {
+                  Logger.warn("Failed to decode client login payload");
+                  return;
+               }
+
+               Logger.debug("Login client payload:", payload);
+
+               const unknownFields = summarizeUnknownTokenPayloadFields(payload);
+               if (unknownFields.length > 0) {
+                  Logger.warn(`Unparsed login token payload fields: ${unknownFields.join(", ")}`);
+               }
+
+               if (typeof payload.cpk === "string") identityPublicKey = payload.cpk;
+               if (typeof payload.xname === "string" && !displayName) displayName = payload.xname;
+               if (typeof payload.xid === "string" && !xuid) xuid = payload.xid;
             } catch { }
          }
       }

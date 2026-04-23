@@ -182,7 +182,9 @@ export class LoginData {
 
    createLoginPacket(options: ClientOptions): LoginPacket {
       const loginPacket = new LoginPacket();
-      const chain = [this.clientIdentityChain, ...this.accessToken];
+      const chain = [this.clientIdentityChain, ...this.accessToken].filter(
+         (value): value is string => typeof value === "string" && value.length > 0,
+      );
       const certificate = JSON.stringify({ chain });
 
       const identityObj: Record<string, unknown> = {
@@ -197,6 +199,31 @@ export class LoginData {
       loginPacket.protocol = ProtocolList[CurrentVersionConst];
       loginPacket.tokens = new LoginTokens(this.clientUserChain, JSON.stringify(identityObj));
       return loginPacket;
+   }
+
+   async createOfflineToken(profile: PlayerProfile): Promise<string> {
+      const josePrivateKey = await jose.importPKCS8(
+         this.privateKey.export({ format: "pem", type: "pkcs8" }) as string,
+         ALGORITHM,
+      );
+
+      const payload = {
+         aud: "api://auth-minecraft-services/multiplayer",
+         cpk: this.clientX509,
+         exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 365,
+         leguuid: profile.uuid,
+         mid: LoginData.nextUUID(profile.name).replace(/-/g, "").slice(0, 16).toUpperCase(),
+         nid: "",
+         nname: "",
+         pid: "",
+         pname: "",
+         xid: profile.xuid || "",
+         xname: profile.name,
+      };
+
+      return new jose.SignJWT(payload)
+         .setProtectedHeader({ alg: ALGORITHM as "ES384", x5u: this.clientX509 })
+         .sign(josePrivateKey);
    }
 
    async createClientChain(

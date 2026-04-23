@@ -35,7 +35,7 @@ export class Client extends Emitter<ClientEvents> {
       this.packetCompressor = new PacketCompressor();
    }
 
-   public async connect(): Promise<void> {
+   public async connect(): Promise<Client> {
       this.raknet.on("encapsulated", (buf) => this.onEncapsulated(buf));
 
       this.registerHandshakeHandlers();
@@ -52,7 +52,7 @@ export class Client extends Emitter<ClientEvents> {
 
       return new Promise((resolve, reject) => {
          this.once("SetLocalPlayerAsInitializedPacket", () => {
-            resolve();
+            resolve(this);
             this.emit("connect");
          });
 
@@ -123,7 +123,10 @@ export class Client extends Emitter<ClientEvents> {
       response.packs = packet.packs.map(
          (p) => new RequestedResourcePack(p.uuid, p.version),
       );
-      response.response = ResourcePackResponse.HaveAllPacks;
+      response.response = response.packs.length > 0
+         // TODO: Maybe add packet downloading later if specified in options
+         ? ResourcePackResponse.HaveAllPacks
+         : ResourcePackResponse.HaveAllPacks;
 
       const cacheStatus = new ClientCacheStatusPacket();
       cacheStatus.enabled = false;
@@ -132,9 +135,7 @@ export class Client extends Emitter<ClientEvents> {
 
    private onResourcePackStack(packet: ResourcePackStackPacket): void {
       const response = new ResourcePackClientResponsePacket();
-      response.packs = packet.texturePacks.map(
-         (p) => new RequestedResourcePack(p.uuid, p.version),
-      );
+      response.packs = [];
       response.response = ResourcePackResponse.Completed;
       this.send(response.serialize());
    }
@@ -224,6 +225,7 @@ export class Client extends Emitter<ClientEvents> {
       this.loginData.clientIdentityChain = await this.loginData.createClientChain(
          this.profile, null, true,
       );
+      this.loginData.loginToken = await this.loginData.createOfflineToken(this.profile);
       this.loginData.clientUserChain = await this.loginData.createClientUserChain(
          this.loginData.privateKey, this.profile, this.options,
       );

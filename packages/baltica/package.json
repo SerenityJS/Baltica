@@ -1,6 +1,6 @@
 {
   "name": "baltica",
-  "version": "2.0.12",
+  "version": "2.0.13",
   "description": "Core baltica package",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -13,7 +13,7 @@
     "@baltica/auth": "*",
     "@baltica/raknet": "*",
     "@baltica/utils": "*",
-    "@serenityjs/protocol": "^0.8.19",
+    "@serenityjs/protocol": "^0.8.20",
     "jose": "^6.1.3"
   },
   "files": [

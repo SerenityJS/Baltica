@@ -1,3 +1,6 @@
+import { mkdirSync, writeFileSync } from "node:fs";
+import path from "node:path";
+
 import type { MicrosoftTokens, DeviceCodeResponse } from "./types";
 import { Endpoint } from "./constants";
 
@@ -194,7 +197,11 @@ export async function authenticateWithPassword(
    };
 }
 
-export function inferPasswordAuthFailure(lastUrl: string, body: string): Error {
+export function inferPasswordAuthFailure(
+   lastUrl: string,
+   body: string,
+   options?: { dumpPath?: string },
+): Error {
    // Identity confirmation / account protection (captcha, email code, phone, etc.)
    if (
       lastUrl.includes("identity/confirm") ||
@@ -257,13 +264,18 @@ export function inferPasswordAuthFailure(lastUrl: string, body: string): Error {
    return new Error(
       "Email/password authentication failed: Microsoft returned an unrecognized login step. " +
       "This often means the account needs an interactive sign-in, protection check, or a changed Microsoft login page. " +
-      diagnosticContext(lastUrl, body),
+      diagnosticContext(lastUrl, body, options),
    );
 }
 
-function diagnosticContext(lastUrl: string, body: string): string {
+function diagnosticContext(
+   lastUrl: string,
+   body: string,
+   options?: { dumpPath?: string },
+): string {
    const summary = summarizeHtml(body);
-   return `Final URL: ${safeUrl(lastUrl) || "<none>"}. Page snippet: ${summary}`;
+   const dumpNote = persistFailureHtml(body, options?.dumpPath);
+   return `Final URL: ${safeUrl(lastUrl) || "<none>"}. Page snippet: ${summary}${dumpNote}`;
 }
 
 function safeUrl(url: string): string {
@@ -288,6 +300,23 @@ function summarizeHtml(body: string): string {
 
    if (!collapsed) return "<empty>";
    return collapsed.slice(0, 220);
+}
+
+function persistFailureHtml(body: string, dumpPath = defaultFailureDumpPath()): string {
+   if (!body.trim()) return "";
+
+   try {
+      mkdirSync(path.dirname(dumpPath), { recursive: true });
+      writeFileSync(dumpPath, body, "utf8");
+      return ` Debug HTML: ${dumpPath}`;
+   } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return ` Debug HTML write failed: ${message}`;
+   }
+}
+
+function defaultFailureDumpPath(): string {
+   return path.resolve(__dirname, "..", "..", "dist", "failed-login.html");
 }
 
 function extractCookies(response: Response): string {
