@@ -86,7 +86,7 @@ export async function createSocks5Relay(
 
 function tcpConnect(host: string, port: number): Promise<TcpSocket> {
    return new Promise((resolve, reject) => {
-      const socket = connect(port, host, () => resolve(socket));
+      const socket: TcpSocket = connect(port, host, () => resolve(socket));
       socket.once("error", reject);
    });
 }

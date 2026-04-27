@@ -1,3 +1,5 @@
+import type { ICacheProvider } from "../cache";
+
 export type AuthFlow = "deviceCode" | "password" | "xboxToken";
 
 export interface AuthOptions {
@@ -6,6 +8,8 @@ export interface AuthOptions {
    username: string;
    cacheDir: string;
    clientPublicKey?: string;
+   /** Pluggable cache provider. If set, overrides file-based caching (cacheDir/username are ignored). */
+   cacheProvider?: ICacheProvider;
    /** Required when flow is "password" */
    email?: string;
    /** Required when flow is "password" */

@@ -1,5 +1,6 @@
 import { ClientOptions as RaknetOptions, defaultClientOptions as defaultRaknetClientOptions } from "@baltica/raknet";
 import { CompressionMethod, DeviceOS } from "@serenityjs/protocol";
+import type { ICacheProvider } from "@baltica/auth";
 import type { SkinData } from "./login/login-data";
 
 export interface LoginOptions {
@@ -46,6 +47,8 @@ export type ClientOptions = {
    password?: string;
    /** XBL3.0 token for xbox token auth flow. Format: "XBL3.0 x={userHash};{token}" */
    xboxToken?: string;
+   /** Pluggable cache provider. If set, overrides file-based caching. */
+   cacheProvider?: ICacheProvider;
 } & RaknetOptions;
 
 export const defaultClientOptions = {
