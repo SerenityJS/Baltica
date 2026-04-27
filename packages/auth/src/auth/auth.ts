@@ -5,12 +5,12 @@ import { requestDeviceCode, pollDeviceCode, refreshMicrosoftToken, authenticateW
 import { authenticateXbl, authenticateXsts } from "./xbox";
 import { loginWithPlayFab } from "./playfab";
 import { getBedrockChain, getMinecraftServicesToken, getMultiplayerSessionToken } from "./session";
-import { AuthCache, isTokenValid } from "./cache";
+import { AuthCache, isTokenValid, type ICacheProvider } from "./cache";
 import { generateKeyPair } from "./keypair";
 
 export class Auth extends Emitter<AuthEvents> {
    public options: AuthOptions;
-   private cache: AuthCache;
+   private cache: ICacheProvider;
 
    constructor(options: Partial<AuthOptions> = {}) {
       super();
@@ -21,7 +21,7 @@ export class Auth extends Emitter<AuthEvents> {
          this.options.username = this.options.email.split("@")[0]!;
       }
 
-      this.cache = new AuthCache(this.options.cacheDir, this.options.username);
+      this.cache = this.options.cacheProvider ?? new AuthCache(this.options.cacheDir, this.options.username);
    }
 
    public async login(): Promise<AuthResult> {
@@ -51,7 +51,7 @@ export class Auth extends Emitter<AuthEvents> {
       }
 
       try {
-         const cached = this.cache.load();
+         const cached = await this.cache.load();
          const keypair = cached.keypair ?? generateKeyPair();
 
          const cachedResult = await this.tryUseCached(cached, keypair);
@@ -76,7 +76,7 @@ export class Auth extends Emitter<AuthEvents> {
 
          const result = await this.authenticateChain(msTokens, keypair);
 
-         this.cache.save({
+         await this.cache.save({
             microsoft: msTokens,
             xbl: result.xbl,
             xsts: result.xsts,
@@ -95,8 +95,8 @@ export class Auth extends Emitter<AuthEvents> {
    }
 
    public async logout(): Promise<void> {
-      const cached = this.cache.load();
-      this.cache.save({
+      const cached = await this.cache.load();
+      await this.cache.save({
          microsoft: cached.microsoft,
          keypair: cached.keypair,
       });
@@ -166,7 +166,7 @@ export class Auth extends Emitter<AuthEvents> {
          const userHash = match[1]!;
          const token = match[2]!;
 
-         const keypair = this.cache.load().keypair ?? generateKeyPair();
+         const keypair = (await this.cache.load()).keypair ?? generateKeyPair();
          const clientPublicKey = this.options.clientPublicKey ?? keypair.publicKey;
 
          const xsts = { token, userHash, gamertag: "", xuid: "", expiresAt: Date.now() + 24 * 60 * 60 * 1000 };
@@ -186,7 +186,7 @@ export class Auth extends Emitter<AuthEvents> {
 
          const result: AuthResult = { profile, xbl, xsts, playFab, mcServices, multiplayerSession, bedrockChain: bedrock.chain, keypair };
 
-         this.cache.save({
+         await this.cache.save({
             xbl: result.xbl,
             xsts: result.xsts,
             playFab: result.playFab,

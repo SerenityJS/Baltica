@@ -39,7 +39,7 @@ export class Server extends Emitter<ServerEvents> {
       return new Promise((resolve) => {
          this.socket.bind(this.options.port, this.options.address);
          this.socket.on("listening", () => {
-            this.socket.on("message", (buffer, rinfo) => this.handleMessage(buffer, rinfo));
+            this.socket.on("message", (buffer: Buffer, rinfo: RemoteInfo) => this.handleMessage(buffer, rinfo));
             resolve();
          });
       });

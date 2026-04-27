@@ -2,7 +2,13 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import type { TokenCache } from "./types";
 
-export class AuthCache {
+export interface ICacheProvider {
+   load(): TokenCache | Promise<TokenCache>;
+   save(cache: TokenCache): void | Promise<void>;
+   clear(): void | Promise<void>;
+}
+
+export class AuthCache implements ICacheProvider {
    private filePath: string;
 
    constructor(cacheDir: string, username: string) {

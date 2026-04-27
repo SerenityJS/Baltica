@@ -255,6 +255,7 @@ export class Client extends Emitter<ClientEvents> {
          email: this.options.email,
          password: this.options.password,
          xboxToken: this.options.xboxToken,
+         cacheProvider: this.options.cacheProvider,
       });
 
       return new Promise((resolve, reject) => {

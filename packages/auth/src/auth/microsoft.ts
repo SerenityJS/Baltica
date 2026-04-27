@@ -320,8 +320,8 @@ function defaultFailureDumpPath(): string {
 }
 
 function extractCookies(response: Response): string {
-   const setCookies = response.headers.getSetCookie?.() ?? [];
-   return setCookies.map((c) => c.split(";")[0]).join("; ");
+   const setCookies = (response.headers as any).getSetCookie?.() ?? [];
+   return setCookies.map((c: string) => c.split(";")[0]).join("; ");
 }
 
 function mergeCookies(existing: string, incoming: string): string {
